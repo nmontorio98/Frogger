@@ -10,14 +10,17 @@ import org.newdawn.slick.SlickException;
 public class World {
 	
 	private String[] levels = {"assets/levels/0.lvl", "assets/levels/1.lvl"} ;
-	private int curr_level = 1;
+	private int curr_level = 0;
+	private int current_rnum;
 	public static final int TILE_SIZE = 48;
 	public static final int GOAL_SIZE = TILE_SIZE*2;
+	private final int E_WAIT = 14;
 	private int num_starting_lives = 3;
+	private int targets_filled;	
+	private int ex_timer;
+	
 	
 	static Random rand = new Random();
-	private static int NUM;
-	
 	
 	@SuppressWarnings("unused")
 	private boolean death_flag;
@@ -26,26 +29,34 @@ public class World {
 	private ArrayList<Vehicle> rideable = new ArrayList<Vehicle>();
 	private ArrayList<Vehicle> kot_vehicles = new ArrayList<Vehicle>();
 	private ArrayList<Lives> lives = new ArrayList<Lives>();
-	private ArrayList<Gates> goals = new ArrayList<Gates>();
 	private ArrayList<Vehicle> logs = new ArrayList<Vehicle>();
-	private ArrayList<ExtraLife> e_lifes = new ArrayList<ExtraLife>();
+	private ArrayList<Sprite> targets = new ArrayList<Sprite>();
 	
+	private ExtraLife ex;
 	private Player sprite;
+	private int PLAYER_START_X = 512; // 512,720 : 512, 384 :93.6111
+	private int PLAYER_START_Y = 720;
+	
 
 	public static long map_time =  0;
+	public long ex_alive_time = 0;
+	
 	
 	public World() throws SlickException {
+		
+		/* Performs initialization of all objects and tiles */
 		createMap();
+		createLives();
 		createGates();
-		NUM = rand.nextInt(logs.size());
-		//NUM = 5;
-		System.out.println(NUM + "x: " +  logs.get(NUM).getX() + "y: " + logs.get(NUM).getY());
-		//extraLife = new ExtraLife("assets/extralife.png", logs.get(NUM).getX(), logs.get(NUM).getY(), logs.get(NUM).getWidth());
-		sprite = new Player("assets/frog.png", (float)888, 96); // 512,720 : 512, 384 :93.6111
+		sprite = new Player("assets/frog.png",PLAYER_START_X, PLAYER_START_Y); 
 		
 	}
 	
+	
 	public void kill() {
+		
+		/* Remove a single life from the player and ends the game 
+		 * when the life count is zero */ 
 		lives.remove(lives.size() -1);
 		if(lives.isEmpty()) {
 			System.exit(0);
@@ -55,58 +66,89 @@ public class World {
 		}
 	}
 	
+	
 	public void reset() {
-		sprite.setSpriteX(512); 
-		sprite.setSpriteY(384);
+		
+		/* Resets players position to values in the specification */
+		sprite.setSpriteX(PLAYER_START_X); 
+		sprite.setSpriteY(PLAYER_START_Y);
 	}
 	
 	public void render(Graphics g) {
 		
+		/* Renders all objects that kill the player on contact/ or are tiles*/
 		for(Vehicle k: kot_vehicles) {
 			k.render(g);
 		}
 		for(Tile tile: tiles) {
 			tile.render(g);
 		}
+		
+		/* renders objects that the player can "attach" to (turtle, log, bulldozer") */
 		for(Vehicle r: rideable) {
 			r.render(g);
 		}
+		int count = 0;
 		for(Vehicle log: logs) {
 			log.render(g);
+			g.drawString("" + count, log.getX(),log.getY());
+			count++;
 		}
+		
+		/* renders all of the frog sprites */
 		for(Lives life: lives){
 			life.render(g);
 		}
-/*		for(Sprite goal: goals) {
+		for(Sprite goal: targets) {
 			goal.render(g);
-		}*/
-		for(ExtraLife object: e_lifes) {
-			object.render(g);
+		}
+		if(ex != null) {
+			ex.render(g);
 		}
 		sprite.render(g);
+		
+		
 		g.drawString("TIME: " + map_time/1000.1f, 512, 720);
-		for(int i = 0; i< App.SCREEN_WIDTH; i+=48) {
-			g.drawString("" + i, i, 48);
-		}
+		g.drawString("ex_timer" + ex_timer, 0, 384);
 	}
 	
 	public void update(Input input, int delta) throws SlickException {
 		boolean death_flag = false;
-		boolean riding = true; // change back to false
+		boolean riding = false;
+		
 		map_time += delta;
 		
-		for(ExtraLife life: e_lifes) {
-			life.attach(logs.get(NUM).getSpeed(), delta);
+		/* After a random period of time an ExtraLife is made */
+//		if(map_time % (ex_timer*1000)  == 0) {
+//			createExtraLife();
+//			ex.setUnderWater(true);
+//		}
+		
+		if(map_time == rand.nextInt(10)*1000) {
+			createExtraLife();
+			ex.setUnderWater(true);
 		}
 		
-		/* Change level */
-		if(input.isKeyPressed(Input.KEY_C)) {
-			curr_level = (curr_level + 1)%2;
+		/* Goes to the next level if all the holes are filled */
+		if(targets_filled == targets.size()) {
+			targets_filled = 0;
+			ex = null;
+			curr_level = (curr_level + 1) % levels.length;
 			createMap();
+			createGates();
+			createExtraLife(); // have a look
 			reset();
+	
+		}
+		
+		/* allows extra life sprite to ride on the log*/
+		if(ex != null) {
+			ex.attach(logs.get(current_rnum).getSpeed(), delta);
+			ex.update();
+			ex_alive_time += delta;
+			
 		}
 
-		
 		/* Check for collision with kill on touch vehicles and updates these vehicles */
 		for( Vehicle object: kot_vehicles) {
 			object.update(delta);
@@ -118,42 +160,46 @@ public class World {
 		/*Update all rideable objects and attach player to above water objects */
 		for(Vehicle w_object: rideable) {
 			w_object.update(delta);
+			
+			/* wont let player move through solid vehicles */
 			if(sprite.intersects(w_object) && w_object.getSolid()) {
-				sprite.setSpriteX(sprite.getLastX());
-				sprite.setSpriteY(sprite.getLastY()); 
+				sprite.moveBack();
 			}
+			
+			/* Causes player to ride with the vehicle */
 			if(sprite.intersects(w_object) && !w_object.getUnderWater()){
 				riding = true;
 				sprite.attach(w_object.getSpeed(), delta);
+				
+				/* kills player if they are "squished" against the out of bounds area */
 				if(w_object.getSolid() && sprite.getX() >= App.SCREEN_WIDTH - TILE_SIZE) {
 					death_flag = true;
 				}
 			}
 		}
 		
+		/* moves the logs and attaches the sprite if on them */
 		for (Vehicle log: logs) {
 			log.update(delta);
+			
 			if(sprite.intersects(log) && !log.getUnderWater()){
 				riding = true;
-				//sprite.attach(log.getSpeed(), delta);
+				sprite.attach(log.getSpeed(), delta);
 			}
 		}
 		
 		/* Extralife follows log off screen and onto the other side */
-		ExtraLife extraLife = e_lifes.get(0);
-		if(logs.get(NUM).getOffScreen()) {	
-			System.out.println("FLAG");
-			if (logs.get(NUM).getDirection() == 1) {
-				extraLife.setSpriteX(0- logs.get(NUM).getWidth()/2 + extraLife.getX() - logs.get(NUM).getPrevX() ); // extraLife.getX() - App.SCREEN_WIDTH 
+		if(ex != null && logs.get(current_rnum).getOffScreen()) {	
+			
+			if (logs.get(current_rnum).getDirection() == 1) {
+				ex.setSpriteX(0- logs.get(current_rnum).getWidth()/2 + ex.getX() - logs.get(current_rnum).getPrevX() );
 			}
 			else {
-				extraLife.setSpriteX(App.SCREEN_WIDTH + logs.get(NUM).getWidth()/2 + extraLife.getX() - logs.get(NUM).getPrevX() );
+				System.out.println("TRIPPED");
+				ex.setSpriteX(App.SCREEN_WIDTH + logs.get(current_rnum).getWidth()/2 + ex.getX() - logs.get(current_rnum).getPrevX() );
 			}
 		}
-		if(map_time % 1000 == 0) {
-			extraLife.update();
-		}
-	
+
 		/* kills player if they "fall" in water/KOT tile and also doesn't allow them to move through
 		 * solid tiles */
 		for( Tile tile: tiles) {
@@ -161,36 +207,33 @@ public class World {
 				death_flag = true;
 			}
 			else if(sprite.intersects(tile) && tile.touchable == 2) {
-				sprite.setSpriteX(sprite.getLastX());
-				sprite.setSpriteY(sprite.getLastY()); 
-				
+				sprite.moveBack();	
 			}
 		}
+		
+		/* kills player if they are supposed to die */
 		if(death_flag == true) {
 			kill();
 		}
 		
 		/* Checks to see if the sprite reached a goal which is located in the last row of tiles */
-		if(sprite.getY()<= TILE_SIZE) {
-			float goal_x =  (float) sprite.getX()%(GOAL_SIZE); //problem if there is only one tree at the start and not 2
-			goal_x = (float) (Math.floorDiv((int)sprite.getX(), TILE_SIZE) * TILE_SIZE + 0.5*TILE_SIZE);
-			
-			
-			//goals.add(new Sprite("assets/frog.png", goal_x , TILE_SIZE));
-			if(goals.size() == 5) {
-				curr_level = (curr_level + 1)%2;
-				createMap();
+		for(Sprite target: targets) {
+			if(sprite.intersects(target) && target.getUnderWater()) {
+				target.setUnderWater(false);
+				targets_filled++;
+				reset();
 			}
-			reset();
+			else if(sprite.intersects(target)) {
+				kill();
+			}
 		}
 		
-		if(sprite.intersects(extraLife)) {
-			extraLife.setSpriteX(512);
-			extraLife.setSpriteY(510);
-			System.out.println("asdhiauhd");
+		/* increases lives if extraLife is touched */
+		if(ex != null && sprite.intersects(ex)) {
+			ex = null;
 			int remainingLives = lives.size();
 			lives.add(new Lives(24 + 32*(remainingLives), 744));
-			
+			createExtraLife();
 		}
 		
 		/* Move player */
@@ -202,19 +245,16 @@ public class World {
 		/* sets initial direction to left */
 		int dir = 1;
 		map_time = 0;
-		
-		/* Creates the number of starting lives */
-		for( int i = 0; i< num_starting_lives; i++) {
-			lives.add(new Lives(24 + 32*i, 744));
-		}
+		ex_timer = rand.nextInt(10) + 1;// + 25;
+		targets_filled = 0;
 		
 		/* clears all objects and tiles on map */
 		rideable.clear();
 		kot_vehicles.clear();
 		logs.clear();
 		tiles.clear();
-		goals.clear();
-		e_lifes.clear();
+		targets.clear();
+		ex = null;
 
 		/* reads the level file and adds each object to their appropriate ArrayList */
 		try (BufferedReader br = new BufferedReader(new FileReader(levels[curr_level]))) {
@@ -268,39 +308,52 @@ public class World {
                 	rideable.add(new Turtle("assets/turtles.png", x, y, 0.1f, false, dir));
                 }
                 dir = 1;
-            }
-            e_lifes.add(new ExtraLife("assets/extralife.png", logs.get(NUM).getX(), logs.get(NUM).getY(), logs.get(NUM).getWidth()));
-            
+            }         
         } catch (Exception e) {
             e.printStackTrace();
         }
 	}
 	
-	public void createGates() {
+	/* Finds the holes in the top 2nd row of tiles and puts sprites in them */
+	public void createGates() throws SlickException {
 		float curr_x = 0;
 		float prev_x = 0;
 		
 		for(Tile tile: tiles) {
 			if(tile.getY() == TILE_SIZE) {
 				curr_x = tile.getX();
+				
+				/* Finds the gap and puts a hidden sprite in the middle */
 				if(curr_x - prev_x > TILE_SIZE) {
-					System.out.println("prev_x " + prev_x + "cur " + curr_x);
-					goals.add(new Gates(prev_x, curr_x, TILE_SIZE,TILE_SIZE));
+					targets.add(new Sprite("assets/frog.png", (float) (prev_x+ 0.5*(curr_x - prev_x)), TILE_SIZE, true));
 				}
 				prev_x = curr_x;
 			}
 		}
+
+	}
+	
+	public void createLives() throws SlickException {
+		/* Creates the number of starting lives */
+		for( int i = 0; i< num_starting_lives; i++) {
+			lives.add(new Lives(24 + 32*i, 744));
+		}
+	}
+	
+	
+	public void createExtraLife() throws SlickException {
+		current_rnum = createRnd(logs.size());
+		System.out.println(ex_alive_time);
+		ex = new ExtraLife("assets/extralife.png", logs.get(current_rnum).getX(), logs.get(current_rnum).getY(), logs.get(current_rnum).getWidth());
+		ex_alive_time = 0;
 		
-		
-		
-		/*for(Tile tile: tiles) {
-			if(tile.getY() == TILE_SIZE) {
-				start_x = tile.getX();
-				System.out.println(start_x);
-			}
-		}*/
+	}
+	
+	
+	public int createRnd(int max) {
+		return rand.nextInt(max);
 	}
 }
 
-
+	
 	

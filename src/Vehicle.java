@@ -5,7 +5,7 @@ public class Vehicle extends Sprite{
 	private float speed;
 	//private int offset;
 	private int direction;
-	private boolean underWater = false;
+	
 	private boolean solid;
 	private boolean offScreen;
 
@@ -42,9 +42,7 @@ public class Vehicle extends Sprite{
 	public float getSpeed() {
 		return speed;
 	}
-	public boolean getUnderWater() {
-		return underWater;
-	}
+	
 	public void setSpeed(int dir) {
 		speed = dir*speed;
 	}

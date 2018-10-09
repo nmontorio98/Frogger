@@ -7,10 +7,8 @@ import utilities.BoundingBox;
 
 public class Sprite extends BoundingBox{
 	private final Image image;
-	private float xpos, ypos, prev_x, prev_y;
-	//private float width;
-	//private float height;
-
+	private float xpos, ypos, prev_x;
+	private boolean underWater = false;
 
 	public Sprite(String imageSrc, float x, float y) throws SlickException{
 
@@ -22,14 +20,19 @@ public class Sprite extends BoundingBox{
 		this.ypos = y; 
 	}
 	
+	public Sprite(String imageSrc, float x, float y, boolean hidden) throws SlickException{
+		super( new Image(imageSrc), x, y);
+		image = new Image(imageSrc);
+		this.xpos = x;
+		this.ypos = y;
+		underWater = hidden;
+	}
+	
+	/* moves sprite along with whatever it is attached to */
 	public void attach(float speed, int delta) {
 		this.xpos+=speed*delta;	
 	}
 	
-	public void moveBack() {
-		this.xpos = prev_x;
-		this.ypos = prev_y;
-	}
 	
 	/* Getters */
 	public float getX() {
@@ -53,10 +56,13 @@ public class Sprite extends BoundingBox{
 	public float getPrevX() {
 		return prev_x;
 	}
+	public boolean getUnderWater() {
+		return underWater;
+	}
 	
-	/*public float getHeight() {
-		//return height;
-	}*/
+	public void setUnderWater(boolean val) {
+		underWater = val;
+	}
 	
 	/* Update bound box with setters */
 	public void update(Input input, int delta) {
@@ -66,9 +72,11 @@ public class Sprite extends BoundingBox{
 	}
 	
 	public void render(Graphics g) {
-		prev_x = this.xpos;
-		prev_y = this.ypos;
-		image.drawCentered(xpos, ypos);
+		if(!underWater) {
+			prev_x = this.xpos;
+//			prev_y = this.ypos;
+			image.drawCentered(xpos, ypos);
+		}
 	}
 	
 

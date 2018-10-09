@@ -14,12 +14,20 @@ public class ExtraLife extends Sprite{
 	}
 	
 	public void update() {
-		if(position == moves || position == 0) { 
-			dir = -1*dir;
+		if(World.map_time % 1000 == 0) {
+			if(position == moves || position == 0) { 
+				dir = -1*dir;
+			}
+			this.setSpriteX(getX()+ dir*48);
+			position += dir;
+			setX(getX());
+			setY(getY());
 		}
-		this.setSpriteX(getX()+ dir*48);
-		position += dir;
-		setX(getX());
-		setY(getY());
+		if((World.map_time % 4000.0) <= 5000 ) {
+			this.setUnderWater(false);
+		}
+		else {
+			this.setUnderWater(true);
+		}
 	}
 }

@@ -61,5 +61,10 @@ public class Player extends Sprite {
 	public float getLastY() {
 		return last_y;
 	}
-
+	
+	/* forces sprite back to wh */
+	public void moveBack() {
+		this.setSpriteX(this.getLastX());
+		this.setSpriteY(this.getLastY());
+	}
 }
